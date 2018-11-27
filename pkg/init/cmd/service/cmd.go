@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/runtime/restart"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -141,6 +142,11 @@ func stop(ctx context.Context, service, sock, basePath string) (string, uint32, 
 		return "", 0, "deleting task", err
 	}
 
+	err = ctr.Update(ctx, restart.WithNoRestarts)
+	if err != nil {
+		return "", 0, "failed to clear restart monitor", err
+	}
+
 	err = ctr.Delete(ctx)
 	if err != nil {
 		return "", 0, "deleting container", err
@@ -225,6 +231,11 @@ func start(ctx context.Context, service, sock, basePath, dumpSpec string) (strin
 	if err := task.Start(ctx); err != nil {
 		// Don't destroy the container here so it can be inspected for debugging.
 		return "", 0, "failed to start task", err
+	}
+
+	err = ctr.Update(ctx, restart.WithStatus(containerd.Running))
+	if err != nil {
+		return "", 0, "failed to add restart monitor", err
 	}
 
 	return ctr.ID(), task.Pid(), "", nil
